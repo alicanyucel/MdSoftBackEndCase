@@ -1,5 +1,5 @@
-
-using MdSoftBackEndCase.Context.DocumentManagementSystem.Data;
+using DocumentManagementSystem.Data;
+using MdSoftBackEndCase.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -33,33 +33,36 @@ namespace MdSoftBackEndCase
                         ValidAudience = jwtSettings["Audience"]
                     };
                 });
+
             builder.Services.AddCors(opt =>
             {
-                opt.AddDefaultPolicy(builder =>
+                opt.AddDefaultPolicy(policy =>
                 {
-                    builder.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin();
+                    policy.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin();
                 });
             });
-            builder.Services.AddDbContext<AppDbContext>(opt =>
+            builder.Services.AddDbContext<AppDbContext>(options =>
             {
-                opt.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer"));
+                options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer"));
             });
-            // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+
+           
+            builder.Services.AddScoped<IDocumentService, DocumentService>(); 
+
             builder.Services.AddOpenApi();
 
             var app = builder.Build();
 
-            // Configure the HTTP request pipeline.
+            
             if (app.Environment.IsDevelopment())
             {
                 app.MapOpenApi();
             }
+
             app.UseCors();
-
             app.UseHttpsRedirection();
-
+            app.UseAuthentication();  
             app.UseAuthorization();
-
 
             app.MapControllers();
 

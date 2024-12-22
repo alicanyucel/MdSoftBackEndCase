@@ -1,64 +1,72 @@
-﻿using MdSoftBackEndCase.Services;
-using Microsoft.AspNetCore.Http;
+﻿using Azure.Core;
+using MdSoftBackEndCase.Models;
+using MdSoftBackEndCase.Services;
 using Microsoft.AspNetCore.Mvc;
 
-namespace MdSoftBackEndCase.Controllers;
+[Route("api/[controller]")]
+[ApiController]
+public class DocumentsController : ControllerBase
+{
+    private readonly IDocumentService _documentService;
 
-        [Route("api/[controller]/[action]")]
-        [ApiController]
-        public class DocumentController : ControllerBase
+    public DocumentsController(IDocumentService documentService)
+    {
+        _documentService = documentService;
+    }
+
+    // GET: api/Documents
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<Document>>> GetDocuments()
+    {
+        try
         {
-            private readonly DocumentService _documentService;
-            private readonly string _storagePath = Path.Combine(Directory.GetCurrentDirectory(), "Uploads");
-
-            public DocumentController(DocumentService documentService)
-            {
-                _documentService = documentService;
-            }
-
-            // Belge Yükleme
-            [HttpPost("upload")]
-            public async Task<IActionResult> UploadDocument([FromHeader] string user, [FromForm] IFormFile file)
-            {
-                if (user != "admin")
-                    return Unauthorized("Only admins can upload documents.");
-
-                if (file == null || file.Length == 0)
-                    return BadRequest("No file uploaded.");
-
-                var filePath = Path.Combine(_storagePath, file.FileName);
-
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
-
-                var document = await _documentService.UploadDocumentAsync(file.FileName, (int)file.Length);
-
-                return Ok(new { document.Id, document.FileName });
-            }
-
-            // Belge İndirme
-            [HttpGet("download/{fileName}")]
-            public IActionResult DownloadDocument(string fileName)
-            {
-                var filePath = Path.Combine(_storagePath, fileName);
-
-                if (!System.IO.File.Exists(filePath))
-                    return NotFound("File not found.");
-
-                var fileBytes = System.IO.File.ReadAllBytes(filePath);
-                return File(fileBytes, "application/octet-stream", fileName);
-            }
-
-            // Belgeleri Listeleme
-            [HttpGet("list")]
-            public async Task<IActionResult> ListDocuments()
-            {
-                var documents = await _documentService.GetDocumentsAsync();
-                return Ok(documents);
-            }
+            var documents = await _documentService.GetDocumentsAsync();
+            return Ok(documents);
         }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 
+    // POST: api/Documents/upload
+    [HttpPost("upload")]
+    public async Task<IActionResult> UploadDocument(IFormFile file)
+    {
+        try
+        {
+            var username = Request.Headers["Username"].ToString();
+            if (string.IsNullOrEmpty(username))
+            {
+                return Unauthorized("Username is required.");
+            }
+
+            var fileName = await _documentService.UploadDocumentAsync(file, username);
+            return Ok(new { FileName = fileName });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // GET: api/Documents/download/1
+    [HttpGet("download/{id}")]
+    public async Task<IActionResult> DownloadDocument(int id)
+    {
+        try
+        {
+            var fileBytes = await _documentService.DownloadDocumentAsync(id);
+            var document = await _documentService.GetDocumentByIdAsync(id);
+            return File(fileBytes, document.FileType, document.FileName);
+        }
+        catch (FileNotFoundException)
+        {
+            return NotFound("Document not found.");
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 }
