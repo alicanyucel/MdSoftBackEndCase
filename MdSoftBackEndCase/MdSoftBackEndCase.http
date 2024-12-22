@@ -1,0 +1,6 @@
+@MdSoftBackEndCase_HostAddress = http://localhost:5117
+
+GET {{MdSoftBackEndCase_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
